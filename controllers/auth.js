@@ -69,7 +69,7 @@ export const register = async (req, res) => {
         // const streamToken = serverClient.createToken(user._id.toString());
 
         return res.status(201).json({
-            success: false,
+            success: true,
             message: "User registered successfully",
             data: user,
             // streamToken
