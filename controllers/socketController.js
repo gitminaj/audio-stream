@@ -31,6 +31,7 @@ const socketController = {
         socket.broadcast.emit("userOnline", { userId });
 
         socket.emit("authenticated", { success: true });
+        // console.log('authenticate', socket.userId )
       } catch (error) {
         socket.emit("error", { message: "Authentication failed" });
       }
@@ -47,6 +48,7 @@ const socketController = {
           fileName,
           replyTo,
         } = data;
+
 
         if (!socket.userId) {
           socket.emit("error", { message: "Not authenticated" });

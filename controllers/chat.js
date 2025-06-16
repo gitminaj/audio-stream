@@ -24,7 +24,8 @@ const chatController = {
       chatRoom = new ChatRoom({
         name: 'private',
         type: 'private',
-        participants: [userId, receiverId]
+        participants: [userId, receiverId],
+        admin: userId
       });
       await chatRoom.save();
       await chatRoom.populate('participants', 'name email profile isOnline lastSeen');
@@ -88,14 +89,7 @@ const chatController = {
         })
       }
 
-      if(!picture){
-        return res.status(400).json({
-          success: false,
-          messsage: "Picture is required"
-        })
-      }
-
-      const picturePath = picture.path;
+      const picturePath = picture ? picture.path : null;
       
       const chatRoom = new ChatRoom({
         picture: picturePath,
@@ -120,10 +114,10 @@ const chatController = {
       
       res.status(201).json({ success: true, chatRoom });
     } catch (error) {
+      console.log('error', error.message)
       res.status(500).json({ success: false, error: error.message });
     }
   },
-
 
 
   // get group room between users
