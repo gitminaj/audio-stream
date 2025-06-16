@@ -60,19 +60,19 @@ export const register = async (req, res) => {
             profile: file,
         })
 
-        await serverClient.upsertUser({
-            id: user._id.toString(),
-            name: user.name,
-            profile: `https://ui-avatars.com/api/?name=${user.name}`,
-        });
+        // await serverClient.upsertUser({
+        //     id: user._id.toString(),
+        //     name: user.name,
+        //     profile: `https://ui-avatars.com/api/?name=${user.name}`,
+        // });
 
-        const streamToken = serverClient.createToken(user._id.toString());
+        // const streamToken = serverClient.createToken(user._id.toString());
 
         return res.status(201).json({
             success: false,
             message: "User registered successfully",
             data: user,
-            streamToken
+            // streamToken
         })
 
     } catch (error) {
@@ -121,14 +121,14 @@ export const login = async (req, res) => {
                 httpOnly: true,
             }
 
-            const streamToken = serverClient.createToken(user._id.toString());
+            // const streamToken = serverClient.createToken(user._id.toString());
 
             res.cookie("token", token, options).status(200).json({
                 success: true,
                 message: `User Login Success`,
                 user,
                 token,
-                streamToken,
+                // streamToken,
             })
         } else {
             return res.status(401).json({
