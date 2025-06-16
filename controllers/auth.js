@@ -58,7 +58,9 @@ export const register = async (req, res) => {
             gender,
             phone,
             profile: file,
-        })
+        });
+
+        console.log("user", user);
 
         // await serverClient.upsertUser({
         //     id: user._id.toString(),
