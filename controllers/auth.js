@@ -36,6 +36,7 @@ export const register = async (req, res) => {
         const response = await OTPModel.find({ email }).sort({ createdAt: -1 }).limit(1);
         console.log(response, "Response");
 
+        console.log("here1");
         if (response.length === 0) {
             return res.status(400).json({
                 success: false,
@@ -47,9 +48,10 @@ export const register = async (req, res) => {
                 message: "The OTP is not valid",
             });
         }
-
+        
+        console.log("here2");
         const hashedPassword = await bcrypt.hash(password, 10);
-
+        
         const user = await AuthModel.create({
             name,
             email,
@@ -59,22 +61,14 @@ export const register = async (req, res) => {
             phone,
             profile: file,
         });
-
+        
+        console.log("here3");
         console.log("user", user);
-
-        // await serverClient.upsertUser({
-        //     id: user._id.toString(),
-        //     name: user.name,
-        //     profile: `https://ui-avatars.com/api/?name=${user.name}`,
-        // });
-
-        // const streamToken = serverClient.createToken(user._id.toString());
 
         return res.status(201).json({
             success: true,
             message: "User registered successfully",
             data: user,
-            // streamToken
         })
 
     } catch (error) {
