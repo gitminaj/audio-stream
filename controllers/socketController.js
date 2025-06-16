@@ -66,7 +66,7 @@ const socketController = {
         });
 
         await message.save();
-        await message.populate("sender", "username avatar");
+        await message.populate("sender", "name profile");
 
         if (replyTo) {
           await message.populate("replyTo", "content sender");
@@ -74,7 +74,7 @@ const socketController = {
             path: "replyTo",
             populate: {
               path: "sender",
-              select: "username",
+              select: "name",
             },
           });
         }
@@ -288,7 +288,7 @@ const socketController = {
         message.editedAt = new Date();
 
         await message.save();
-        await message.populate("sender", "username avatar");
+        await message.populate("sender", "name profile");
 
         // Notify all users in the room
         io.to(message.chatRoom.toString()).emit("messageEdited", message);

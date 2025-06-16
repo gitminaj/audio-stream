@@ -12,46 +12,30 @@ dotenv.config();
 export const register = async (req, res) => {
     try {
         const { name, email, password, dateOfBirth, gender, phone, otp } = req.body;
+
         if (!name || !email || !password || !gender || !phone || !dateOfBirth || !otp) {
-            return res.status(400).json({
-                message: "All fields are required",
-            })
+            return res.status(400).json({ message: "All fields are required" });
         }
 
         const profile = req.file;
         if (!profile) {
-            return res.status(400).json({
-                message: "Profile is required",
-            })
+            return res.status(400).json({ message: "Profile is required" });
         }
+
         const file = profile.path;
 
         const existingUser = await AuthModel.findOne({ email });
         if (existingUser) {
-            return res.status(400).json({
-                message: "Email already exists",
-            })
+            return res.status(400).json({ message: "Email already exists" });
         }
 
         const response = await OTPModel.find({ email }).sort({ createdAt: -1 }).limit(1);
-        console.log(response, "Response");
-
-        console.log("here1");
-        if (response.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: "The OTP is not valid",
-            });
-        } else if (otp !== response[0].otp) {
-            return res.status(400).json({
-                success: false,
-                message: "The OTP is not valid",
-            });
+        if (response.length === 0 || otp !== response[0].otp) {
+            return res.status(400).json({ message: "The OTP is not valid" });
         }
-        
-        console.log("here2");
+
         const hashedPassword = await bcrypt.hash(password, 10);
-        
+
         const user = await AuthModel.create({
             name,
             email,
@@ -61,23 +45,40 @@ export const register = async (req, res) => {
             phone,
             profile: file,
         });
-        
-        console.log("here3");
-        console.log("user", user);
 
-        return res.status(201).json({
-            success: true,
-            message: "User registered successfully",
-            data: user,
-        })
+        const token = jwt.sign(
+            { email: user.email, id: user._id },
+            process.env.JWT_SECRET,
+            { expiresIn: "7d" }
+        );
+
+        user.token = token;
+
+        const options = {
+            expires: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), 
+            httpOnly: true,
+        };
+
+        user.password = undefined;
+
+        return res
+            .cookie("token", token, options)
+            .status(201)
+            .json({
+                success: true,
+                message: "User registered and logged in successfully",
+                user,
+                token,
+            });
 
     } catch (error) {
         return res.status(500).json({
             success: false,
             error: error.message,
-        })
+        });
     }
-}
+};
+
 
 
 export const login = async (req, res) => {
