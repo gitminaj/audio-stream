@@ -18,7 +18,7 @@ const chatController = {
     let chatRoom = await ChatRoom.findOne({
       participants: { $all: [userId, receiverId] },
       $expr: { $eq: [{ $size: "$participants" }, 2] }
-    }).populate('participants', 'username email');
+    }).populate('participants', 'name email');
 
     if (!chatRoom) {
       chatRoom = new ChatRoom({
@@ -80,7 +80,7 @@ const chatController = {
       const { name = 'group', description, type = 'group', participants =[], maxParticipants } = req.body;
       const picture = req.file;
       const userId = req.user.id;
-      console.log(name, description, picture, maxParticipants, req.user )
+      // console.log(name, description, picture, maxParticipants, req.user )
 
       if(!userId){
         return res.status(404).json({
@@ -101,7 +101,7 @@ const chatController = {
       });
       
       await chatRoom.save();
-      await chatRoom.populate('participants', 'username email profile isOnline lastSeen');
+      await chatRoom.populate('participants', 'name email profile isOnline lastSeen');
       
       // Notify participants via socket
       participants.forEach(participantId => {
@@ -171,7 +171,7 @@ const chatController = {
           path: 'lastMessage',
           populate: {
             path: 'sender',
-            select: 'username'
+            select: 'name'
           }
         })
         .sort({ lastActivity: -1 })
@@ -220,7 +220,7 @@ const chatController = {
       });
       
       await message.save();
-      await message.populate('sender', 'username avatar');
+      await message.populate('sender', 'name profile');
       
       // Update chat room's last message and activity
       await ChatRoom.findByIdAndUpdate(roomId, {
@@ -250,7 +250,7 @@ const chatController = {
           path: 'replyTo',
           populate: {
             path: 'sender',
-            select: 'username'
+            select: 'name'
           }
         })
         .sort({ createdAt: -1 })
@@ -284,7 +284,7 @@ const chatController = {
       message.editedAt = new Date();
       
       await message.save();
-      await message.populate('sender', 'username avatar');
+      await message.populate('sender', 'name profile');
       
       // Emit updated message to room
       req.io.to(message.chatRoom.toString()).emit('messageEdited', message);
@@ -446,11 +446,11 @@ const chatController = {
       
       const users = await Auth.find({
         $or: [
-          { username: { $regex: query, $options: 'i' } },
+          { name: { $regex: query, $options: 'i' } },
           { email: { $regex: query, $options: 'i' } }
         ]
       })
-      .select('username email avatar isOnline')
+      .select('name email profile isOnline')
       .limit(parseInt(limit));
       
       res.json({ success: true, users });
@@ -473,7 +473,7 @@ const chatController = {
       }
       
       const messages = await Message.find(searchFilter)
-        .populate('sender', 'username avatar')
+        .populate('sender', 'name profile')
         .populate('chatRoom', 'name')
         .sort({ createdAt: -1 })
         .limit(parseInt(limit));
@@ -494,7 +494,7 @@ const chatController = {
         chatRoom: roomId,
         messageType: { $in: ['image', 'file'] }
       })
-      .populate('sender', 'username avatar')
+      .populate('sender', 'name profile')
       .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
