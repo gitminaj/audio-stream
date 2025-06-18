@@ -38,65 +38,71 @@ const socketController = {
     });
 
     // Handle sending messages via socket
-    socket.on("sendMessage", async (data) => {
-      try {
-        const {
-          content,
-          chatRoomId,
-          messageType = "text",
-          fileUrl,
-          fileName,
-          replyTo,
-        } = data;
+   socket.on("sendMessage", async (data) => {
+  try {
+    const {
+      content,
+      chatRoomId,
+      messageType = "text",
+      fileUrl,
+      fileName,
+      replyTo,
+    } = data;
 
+    if (!socket.userId) {
+      socket.emit("error", { message: "Not authenticated" });
+      return;
+    }
 
-        if (!socket.userId) {
-          socket.emit("error", { message: "Not authenticated" });
-          return;
-        }
-
-        const message = new Message({
-          content,
-          sender: socket.userId,
-          chatRoom: chatRoomId,
-          messageType,
-          fileUrl,
-          fileName,
-          replyTo,
-        });
-
-        await message.save();
-        await message.populate("sender", "name profile");
-
-        if (replyTo) {
-          await message.populate("replyTo", "content sender");
-          await message.populate({
-            path: "replyTo",
-            populate: {
-              path: "sender",
-              select: "name",
-            },
-          });
-        }
-
-        // Update chat room's last message and activity
-        await ChatRoom.findByIdAndUpdate(chatRoomId, {
-          lastMessage: message._id,
-          lastActivity: new Date(),
-        });
-
-        // Send message to all users in the chat room
-        io.to(chatRoomId).emit("newMessage", message);
-
-        // Send delivery confirmation to sender
-        socket.emit("messageDelivered", {
-          tempId: data.tempId,
-          messageId: message._id,
-        });
-      } catch (error) {
-        socket.emit("error", { message: "Failed to send message" });
-      }
+    const message = new Message({
+      content,
+      sender: socket.userId,
+      chatRoom: chatRoomId,
+      messageType,
+      fileUrl,
+      fileName,
+      replyTo,
     });
+
+    await message.save();
+    await message.populate("sender", "name profile");
+
+    if (replyTo) {
+      await message.populate("replyTo", "content sender");
+      await message.populate({
+        path: "replyTo",
+        populate: {
+          path: "sender",
+          select: "name",
+        },
+      });
+    }
+
+    // Update chat room's last message and activity
+    await ChatRoom.findByIdAndUpdate(chatRoomId, {
+      lastMessage: message._id,
+      lastActivity: new Date(),
+    });
+
+    // Convert message to object and add full URL if needed
+    const messageObj = message.toObject();
+    if (messageObj.fileUrl && !messageObj.fileUrl.startsWith('http')) {
+      messageObj.fileUrl = `${process.env.BASE_URL || 'http://localhost:3000'}/uploads/${messageObj.fileUrl}`;
+    }
+
+    // Send message to all users in the chat room
+    io.to(chatRoomId).emit("newMessage", messageObj);
+
+    // Send delivery confirmation to sender
+    socket.emit("messageDelivered", {
+      tempId: data.tempId,
+      messageId: message._id,
+    });
+  } catch (error) {
+    console.log('Socket send message error:', error);
+    socket.emit("error", { message: "Failed to send message" });
+  }
+});
 
     // Handle typing indicators
     socket.on("typing", (data) => {

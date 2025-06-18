@@ -29,7 +29,7 @@ export const authenticateJWT = async (req, res, next) => {
     } catch (error) {
         return res.status(401).json({
             success: false,
-            message: `Something Went Wrong While Validating the Token`,
+            message: `Something Went Wrong While Validating the Token: ${error.message}`,
         });
     }
 }

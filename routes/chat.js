@@ -16,7 +16,7 @@ router.post('/rooms/:roomId/leave', chatController.leaveChatRoom);
 router.delete('/rooms/:roomId', chatController.deleteChatRoom);
 
 // Message routes
-router.post('/rooms/:roomId/messages', chatController.sendMessage);
+router.post('/rooms/:roomId/messages', upload.single('file'), chatController.sendMessage);
 router.get('/rooms/:roomId/messages', chatController.getMessages);
 router.put('/messages/:messageId', chatController.editMessage);
 router.delete('/messages/:messageId', chatController.deleteMessage);

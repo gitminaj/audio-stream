@@ -1,7 +1,7 @@
-import { response } from 'express';
 import Auth from '../models/auth.js';
 import ChatRoom from '../models/chatRoom.js';
 import Message from '../models/message.js';
+import path from 'path';
 
 const chatController = {
   // Create a new chat room
@@ -204,38 +204,81 @@ const chatController = {
   },
 
   // Send message (REST endpoint)
-  sendMessage: async (req, res) => {
-    try {
-      const { roomId } = req.params;
-      const { content, senderId, messageType = 'text', fileUrl, fileName, replyTo } = req.body;
-      
-      const message = new Message({
-        content,
-        sender: senderId,
-        chatRoom: roomId,
-        messageType,
-        fileUrl,
-        fileName,
-        replyTo
-      });
-      
-      await message.save();
-      await message.populate('sender', 'name profile');
-      
-      // Update chat room's last message and activity
-      await ChatRoom.findByIdAndUpdate(roomId, {
-        lastMessage: message._id,
-        lastActivity: new Date()
-      });
-      
-      // Emit message to room participants via socket
-      req.io.to(roomId).emit('newMessage', message);
-      
-      res.status(201).json({ success: true, message });
-    } catch (error) {
-      res.status(500).json({ success: false, error: error.message });
-    }
+   sendMessage: async (req, res) => {
+      try {
+        const { roomId } = req.params;
+        const { content ="file", senderId, messageType = 'text', replyTo } = req.body;
+        
+        let fileUrl = null;
+        let fileName = null;
+
+        // If file is uploaded, set file details
+        if (req.file) {
+          fileUrl = path.join('chat', req.file.filename).replace(/\\/g, '/');
+          fileName = req.file.originalname;
+        }
+
+        // Validate based on message type
+        if (messageType === 'text' && !content?.trim()) {
+          return res.status(400).json({ 
+            success: false, 
+            error: 'Message content cannot be empty' 
+          });
+        }
+
+        if ((messageType === 'image' || messageType === 'video') && !fileUrl) {
+          return res.status(400).json({ 
+            success: false, 
+            error: 'File is required for media messages' 
+          });
+        }
+
+        const message = new Message({
+          content: content || '',
+          sender: senderId,
+          chatRoom: roomId,
+          messageType,
+          fileUrl,
+          fileName,
+          replyTo
+        });
+        
+        await message.save();
+        await message.populate('sender', 'name profile');
+        
+        if (replyTo) {
+          await message.populate('replyTo', 'content sender');
+          await message.populate({
+            path: 'replyTo',
+            populate: {
+              path: 'sender',
+              select: 'name',
+            },
+          });
+        }
+        
+        // Update chat room's last message and activity
+        await ChatRoom.findByIdAndUpdate(roomId, {
+          lastMessage: message._id,
+          lastActivity: new Date()
+        });
+        
+        // Emit message to room participants via socket
+        req.io.to(roomId).emit('newMessage', message);
+        
+        res.status(201).json({ 
+          success: true, 
+          message,
+          fileUrl: fileUrl ? `${req.protocol}://${req.get('host')}/uploads/${fileUrl}` : null
+        });
+
+      } catch (error) {
+        console.error('Send message error:', error);
+        res.status(500).json({ success: false, error: error.message });
+      }
+  
   },
+
 
   // Get messages for a chat room
   getMessages: async (req, res) => {

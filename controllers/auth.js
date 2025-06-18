@@ -118,14 +118,11 @@ export const login = async (req, res) => {
                 httpOnly: true,
             }
 
-            // const streamToken = serverClient.createToken(user._id.toString());
-
             res.cookie("token", token, options).status(200).json({
                 success: true,
                 message: `User Login Success`,
                 user,
                 token,
-                // streamToken,
             })
         } else {
             return res.status(401).json({
