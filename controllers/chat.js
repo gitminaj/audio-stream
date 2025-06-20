@@ -80,7 +80,7 @@ const chatController = {
       const { name = 'group', description, type = 'group', participants =[], maxParticipants } = req.body;
       const picture = req.file;
       const userId = req.user.id;
-      // console.log(name, description, picture, maxParticipants, req.user )
+      console.log(name, description, picture, maxParticipants, req.user )
 
       if(!userId){
         return res.status(404).json({
@@ -89,7 +89,7 @@ const chatController = {
         })
       }
 
-      const picturePath = picture ? picture.path : null;
+      const picturePath = picture ? picture.location : null;
       
       const chatRoom = new ChatRoom({
         picture: picturePath,
@@ -212,10 +212,13 @@ const chatController = {
         let fileUrl = null;
         let fileName = null;
 
+        console.log('req file', req.file)
+
+
         // If file is uploaded, set file details
         if (req.file) {
-          fileUrl = path.join('chat', req.file.filename).replace(/\\/g, '/');
-          fileName = req.file.originalname;
+          fileUrl = req.file.path;
+          fileName = req.file.fileName;
         }
 
         // Validate based on message type
@@ -269,7 +272,7 @@ const chatController = {
         res.status(201).json({ 
           success: true, 
           message,
-          fileUrl: fileUrl ? `${req.protocol}://${req.get('host')}/uploads/${fileUrl}` : null
+          fileUrl: fileUrl 
         });
 
       } catch (error) {

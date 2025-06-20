@@ -1,14 +1,14 @@
+import { deleteFromS3 } from "../config/s3Delete.js";
 import Auth from "../models/auth.js";
 import ChatRoom from "../models/chatRoom.js";
 import Message from "../models/message.js";
 
 const socketController = {
   handleConnection: (socket, io) => {
-    // User authentication and setup
     socket.on("authenticate", async (data) => {
       try {
         const { userId } = data;
-        // Update user's online status and socket ID
+
         const res = await Auth.findByIdAndUpdate(
           userId,
           {
@@ -31,78 +31,80 @@ const socketController = {
         socket.broadcast.emit("userOnline", { userId });
 
         socket.emit("authenticated", { success: true });
-        // console.log('authenticate', socket.userId )
+        console.log("authenticate", socket.userId);
       } catch (error) {
         socket.emit("error", { message: "Authentication failed" });
       }
     });
 
     // Handle sending messages via socket
-   socket.on("sendMessage", async (data) => {
-  try {
-    const {
-      content,
-      chatRoomId,
-      messageType = "text",
-      fileUrl,
-      fileName,
-      replyTo,
-    } = data;
+    socket.on("sendMessage", async (data) => {
+      try {
+        const {
+          content,
+          chatRoomId,
+          messageType = "text",
+          fileUrl,
+          fileName,
+          replyTo,
+        } = data;
 
-    if (!socket.userId) {
-      socket.emit("error", { message: "Not authenticated" });
-      return;
-    }
+        if (!socket.userId) {
+          socket.emit("error", { message: "Not authenticated" });
+          return;
+        }
 
-    const message = new Message({
-      content,
-      sender: socket.userId,
-      chatRoom: chatRoomId,
-      messageType,
-      fileUrl,
-      fileName,
-      replyTo,
+        const message = new Message({
+          content,
+          sender: socket.userId,
+          chatRoom: chatRoomId,
+          messageType,
+          fileUrl,
+          fileName,
+          replyTo,
+        });
+
+        await message.save();
+        await message.populate("sender", "name profile");
+
+        if (replyTo) {
+          await message.populate("replyTo", "content sender");
+          await message.populate({
+            path: "replyTo",
+            populate: {
+              path: "sender",
+              select: "name",
+            },
+          });
+        }
+
+        // Update chat room's last message and activity
+        await ChatRoom.findByIdAndUpdate(chatRoomId, {
+          lastMessage: message._id,
+          lastActivity: new Date(),
+        });
+
+        // Convert message to object and add full URL if needed
+        const messageObj = message.toObject();
+        if (messageObj.fileUrl && !messageObj.fileUrl.startsWith("http")) {
+          messageObj.fileUrl = `${
+            process.env.BASE_URL || "http://localhost:3000"
+          }/uploads/${messageObj.fileUrl}`;
+        }
+
+        // Send message to all users in the chat room
+        io.to(chatRoomId).emit("newMessage", messageObj);
+
+        // Send delivery confirmation to sender
+        socket.emit("messageDelivered", {
+          tempId: data.tempId,
+          messageId: message._id,
+        });
+      } catch (error) {
+        console.log("Socket send message error:", error);
+        socket.emit("error", { message: "Failed to send message" });
+      }
     });
-
-    await message.save();
-    await message.populate("sender", "name profile");
-
-    if (replyTo) {
-      await message.populate("replyTo", "content sender");
-      await message.populate({
-        path: "replyTo",
-        populate: {
-          path: "sender",
-          select: "name",
-        },
-      });
-    }
-
-    // Update chat room's last message and activity
-    await ChatRoom.findByIdAndUpdate(chatRoomId, {
-      lastMessage: message._id,
-      lastActivity: new Date(),
-    });
-
-    // Convert message to object and add full URL if needed
-    const messageObj = message.toObject();
-    if (messageObj.fileUrl && !messageObj.fileUrl.startsWith('http')) {
-      messageObj.fileUrl = `${process.env.BASE_URL || 'http://localhost:3000'}/uploads/${messageObj.fileUrl}`;
-    }
-
-    // Send message to all users in the chat room
-    io.to(chatRoomId).emit("newMessage", messageObj);
-
-    // Send delivery confirmation to sender
-    socket.emit("messageDelivered", {
-      tempId: data.tempId,
-      messageId: message._id,
-    });
-  } catch (error) {
-    console.log('Socket send message error:', error);
-    socket.emit("error", { message: "Failed to send message" });
-  }
-});
 
     // Handle typing indicators
     socket.on("typing", (data) => {
@@ -129,6 +131,7 @@ const socketController = {
 
         // Verify user is participant in the room
         const chatRoom = await ChatRoom.findById(chatRoomId);
+        // console.log('chatroom check', chatRoom , socket.userId)
         if (!chatRoom || !chatRoom.participants.includes(socket.userId)) {
           socket.emit("error", { message: "Access denied to chat room" });
           return;
@@ -186,51 +189,52 @@ const socketController = {
 
     // Handle leaving a chat room
     socket.on("leaveRoom", async (data) => {
-  const { chatRoomId } = data;
+      const { chatRoomId } = data;
 
-  try {
-    const chatRoom = await ChatRoom.findById(chatRoomId);
+      try {
+        const chatRoom = await ChatRoom.findById(chatRoomId);
 
-    if (!chatRoom) {
-      socket.emit("error", { message: "Chat room not found" });
-      return;
-    }
+        if (!chatRoom) {
+          socket.emit("error", { message: "Chat room not found" });
+          return;
+        }
 
-    const isAdmin = chatRoom.admin?.toString() === socket.userId;
-    const isGroup = chatRoom.type === "group";
+        const isAdmin = chatRoom.admin?.toString() === socket.userId;
+        const isGroup = chatRoom.type === "group";
 
-    // Only delete if admin is leaving a group room
-    if (isAdmin && isGroup) {
-      io.to(chatRoomId).emit("roomDeleted", { chatRoomId });
+        // Only delete if admin is leaving a group room
+        if (isAdmin && isGroup) {
+          io.to(chatRoomId).emit("roomDeleted", { chatRoomId });
 
-      const connectedSockets = await io.in(chatRoomId).fetchSockets();
-      for (const s of connectedSockets) {
-        s.leave(chatRoomId);
+          const connectedSockets = await io.in(chatRoomId).fetchSockets();
+          for (const s of connectedSockets) {
+            s.leave(chatRoomId);
+          }
+
+          await Message.deleteMany({ chatRoom: chatRoomId });
+          await ChatRoom.findByIdAndDelete(chatRoomId);
+          await deleteFromS3(chatRoom?.picture);
+
+        } else {
+          // Normal leave flow
+          socket.leave(chatRoomId);
+          socket.emit("leftRoom", { chatRoomId });
+
+          chatRoom.participants = chatRoom.participants.filter(
+            (id) => id.toString() !== socket.userId
+          );
+          await chatRoom.save();
+
+          socket.to(chatRoomId).emit("userLeftRoom", {
+            userId: socket.userId,
+            chatRoomId,
+          });
+        }
+      } catch (error) {
+        console.error("Leave room error:", error);
+        socket.emit("error", { message: "Failed to leave room" });
       }
-
-      await Message.deleteMany({ chatRoom: chatRoomId });
-      await ChatRoom.findByIdAndDelete(chatRoomId);
-    } else {
-      // Normal leave flow
-      socket.leave(chatRoomId);
-      socket.emit("leftRoom", { chatRoomId });
-
-      chatRoom.participants = chatRoom.participants.filter(
-        (id) => id.toString() !== socket.userId
-      );
-      await chatRoom.save();
-
-      socket.to(chatRoomId).emit("userLeftRoom", {
-        userId: socket.userId,
-        chatRoomId,
-      });
-    }
-  } catch (error) {
-    console.error("Leave room error:", error);
-    socket.emit("error", { message: "Failed to leave room" });
-  }
-});
-
+    });
 
     // Handle message read receipts
     socket.on("markMessageRead", async (data) => {

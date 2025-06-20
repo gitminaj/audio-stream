@@ -22,8 +22,11 @@ export const register = async (req, res) => {
             return res.status(400).json({ message: "Profile is required" });
         }
 
-        const file = profile.path;
-
+        console.log('profile', req.file , profile)
+        
+        const file = profile.location;
+        
+        console.log('file', file)
         const existingUser = await AuthModel.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ message: "Email already exists" });
