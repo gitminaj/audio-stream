@@ -4,12 +4,11 @@ import s3 from "./s3Client.js";
 export const deleteFromS3 = async (url) => {
   const extractS3Key = (url) => {
     if (!url) return null;
-    const pathname = new URL(url).pathname; // "/%201750418757300-1000281916.jpg%20%20%20"
-    return decodeURIComponent(pathname).slice(1); // Remove leading "/" after decoding
+    const pathname = new URL(url).pathname;
+    return decodeURIComponent(pathname).slice(1); 
   };
 
   const key = extractS3Key(url);
-  console.log('key',key); // " 1750418757300-1000281916.jpg   "
 
   try {
     const command = new DeleteObjectCommand({
