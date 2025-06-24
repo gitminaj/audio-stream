@@ -268,3 +268,54 @@ export const deleteUser = async (req, res) => {
         });
     }
 };
+
+
+export const updateProfile = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    
+    const profile = req?.file?.location || null;
+
+    // Get only allowed fields to update
+    const {
+      name,
+      email,
+      phone,
+      gender,
+      dateOfBirth,
+             // optional: new profile image URL
+      isPrivate
+    } = req.body;
+
+    // Construct update object dynamically
+    const updateData = {};
+
+    if (name) updateData.name = name;
+    if (email) updateData.email = email;
+    if (phone) updateData.phone = phone;
+    if (gender) updateData.gender = gender;
+    if (dateOfBirth) updateData.dateOfBirth = dateOfBirth;
+    if (typeof isPrivate === 'boolean') updateData.isPrivate = isPrivate;
+    if (profile) updateData.profile = profile; // or handle file upload if needed
+
+    const updatedUser = await AuthModel.findByIdAndUpdate(
+      userId,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ success: false,  message: "User not found." });
+    }
+
+    return res.status(200).json({
+        success: true,
+      message: "Profile updated successfully.",
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error("Update Profile Error:", error);
+    return res.status(500).json({ message: "Something went wrong." });
+  }
+};
+

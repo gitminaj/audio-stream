@@ -1,10 +1,11 @@
 import express from "express";
-import { register, login, sendOTP, getSingleUser, getUsers, deleteUser } from "../controllers/auth.js"
+import { register, login, sendOTP, getSingleUser, getUsers, deleteUser, updateProfile } from "../controllers/auth.js"
 import { upload } from "../config/file-upload.js";
 
 const router = express.Router();
 
-router.post("/register", upload.single("profile"), register)
+router.post("/register", upload.single("profile"), register);
+router.put("/profile/:id",upload.single("profile"), updateProfile);
 router.post("/login", login)
 router.post("/sendotp", sendOTP)
 router.get("/users", getUsers)
