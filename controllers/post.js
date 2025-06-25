@@ -1,7 +1,6 @@
 // import { truncates } from "bcryptjs";
 // import PostModel from "../models/post.js";
 
-import { truncates } from "bcryptjs";
 import PostModel from "../models/post.js";
 import multer from 'multer';
 import ffmpeg from 'fluent-ffmpeg';
@@ -9,6 +8,14 @@ import ffmpegStatic from 'ffmpeg-static';
 import path from 'path';
 import fs from 'fs-extra';
 import { v4 as uuidv4 } from 'uuid';
+
+import { S3Client, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { pipeline } from "stream";
+import { promisify } from "util";
+// import { isVideoFile, getFilterMatrixById, processVideoWithFilters } from "../utils/videoUtils.js";
+
+const pipe = promisify(pipeline);
+const s3 = new S3Client({ region: "ap-south-1" }); // update if needed
 
 // Set FFmpeg path
 ffmpeg.setFfmpegPath(ffmpegStatic);
@@ -472,7 +479,25 @@ function isVideoFile(mimetype) {
   return mimetype && mimetype.startsWith('video/');
 }
 
-// Updated createPost function with improved video filter support
+const downloadFromS3 = async (bucket, key, localPath) => {
+  const command = new GetObjectCommand({ Bucket: bucket, Key: key });
+  const response = await s3.send(command);
+  await pipe(response.Body, fs.createWriteStream(localPath));
+};
+
+const uploadToS3 = async (bucket, key, localFilePath, contentType) => {
+  const fileContent = await fs.readFile(localFilePath);
+  await s3.send(new PutObjectCommand({
+    Bucket: bucket,
+    Key: key,
+    Body: fileContent,
+    ContentType: contentType,
+    ACL: "public-read"
+  }));
+  return `https://${bucket}.s3.ap-south-1.amazonaws.com/${encodeURIComponent(key)}`;
+};
+
+// createPost  video filter support
 export const createPost = async (req, res) => {
   try {
     const { id } = req.user;
@@ -480,151 +505,98 @@ export const createPost = async (req, res) => {
     const file = req.file;
 
     if (!file) {
-      return res.status(400).json({
-        success: false,
-        message: 'No file uploaded'
-      });
+      return res.status(400).json({ success: false, message: "No file uploaded" });
     }
 
     if (!body || !body.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Caption is required'
-      });
+      return res.status(400).json({ success: false, message: "Caption is required" });
     }
 
-    console.log('Processing post creation:', {
-      filename: file.filename,
-      mimetype: file.mimetype,
-      size: file.size,
-      videoFilter,
-      imageFilter,
-      hasFilterMatrix: !!filterMatrix
-    });
+    const bucket = file.bucket;
+    const key = (file.key || "").trim();
+    let postUrl = file.location;
+    let mimeType = file.mimetype || file.contentType;
 
-    let finalFilePath = file.path;
-    let finalMimeType = file.mimetype;
+    console.log("Uploaded to S3:", { key, postUrl, mimeType });
 
-    // Process video with filters if needed
-    if (videoFilter && videoFilter !== 'normal' && isVideoFile(file.mimetype)) {
-      console.log('Applying video filter:', videoFilter);
-
+    // Handle video filter processing if needed
+    if (videoFilter && videoFilter !== "normal" && isVideoFile(mimeType)) {
       try {
-        const outputDir = 'uploads/processed/';
-        await fs.ensureDir(outputDir);
+        const tempDir = "temp";
+        await fs.ensureDir(tempDir);
 
-        const processedFileName = `processed-${uuidv4()}.mp4`;
-        const processedFilePath = path.join(outputDir, processedFileName);
+        const inputPath = path.join(tempDir, `input-${uuidv4()}.mp4`);
+        const outputPath = path.join(tempDir, `output-${uuidv4()}.mp4`);
 
-        // Get filter matrix
-        let matrix = null;
-        if (filterMatrix) {
-          try {
-            matrix = JSON.parse(filterMatrix);
-          } catch (parseError) {
-            console.warn('Failed to parse filter matrix, using preset:', videoFilter);
-            matrix = getFilterMatrixById(videoFilter);
-          }
-        } else {
+        // Download from S3
+        await downloadFromS3(bucket, key, inputPath);
+
+        // Get matrix
+        let matrix;
+        try {
+          matrix = filterMatrix ? JSON.parse(filterMatrix) : getFilterMatrixById(videoFilter);
+        } catch {
           matrix = getFilterMatrixById(videoFilter);
         }
 
-        if (!matrix && !getSimplifiedFilter(videoFilter)) {
-          throw new Error(`Filter not found: ${videoFilter}`);
+        if (!matrix && !getFilterMatrixById(videoFilter)) {
+          throw new Error(`No filter found for: ${videoFilter}`);
         }
 
-        // Process the video with filterId for simplified filters
-        await processVideoWithFilters(file.path, matrix, processedFilePath, videoFilter);
+        // Process video
+        await processVideoWithFilters(inputPath, matrix, outputPath, videoFilter);
 
-        // Verify processed file exists and has content
-        const processedStats = await fs.stat(processedFilePath);
-        if (processedStats.size === 0) {
-          throw new Error('Processed video file is empty');
-        }
+        // Upload processed video
+        const processedKey = `posts/processed-${uuidv4()}.mp4`;
+        postUrl = await uploadToS3(bucket, processedKey, outputPath, "video/mp4");
+        mimeType = "video/mp4";
 
-        console.log('Video processing successful:', {
-          originalSize: file.size,
-          processedSize: processedStats.size,
-          filter: videoFilter,
-          reduction: ((file.size - processedStats.size) / file.size * 100).toFixed(2) + '%'
-        });
+        // Clean up
+        await fs.remove(inputPath);
+        await fs.remove(outputPath);
 
-        // Clean up original file
-        await fs.remove(file.path);
-
-        // Update file path to processed version
-        finalFilePath = processedFilePath;
-        finalMimeType = 'video/mp4';
-
-      } catch (processingError) {
-        console.error('Video processing failed:', processingError);
-
-        // Clean up any partial files
-        try {
-          await fs.remove(file.path);
-        } catch (cleanupError) {
-          console.error('Cleanup error:', cleanupError);
-        }
-
+        // Optional: Delete original upload to save space
+        // await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+      } catch (err) {
+        console.error("Video processing failed:", err);
         return res.status(422).json({
           success: false,
-          message: 'Video filter processing failed. Please try again with a different filter or check your video format.',
-          error: processingError.message
+          message: "Video filter processing failed",
+          error: err.message
         });
       }
     }
 
-    // Move final file to permanent storage
-    const permanentDir = 'uploads/posts/';
-    await fs.ensureDir(permanentDir);
-
-    const finalFileName = `post-${uuidv4()}${path.extname(finalFilePath)}`;
-    const permanentFilePath = path.join(permanentDir, finalFileName);
-
-    await fs.move(finalFilePath, permanentFilePath);
-
-    // Create post object
+    // Build and save post
     const postData = {
-      ...req.body,
-      postUrl: permanentFilePath,
-      mediaType: finalMimeType,
-      hasVideoFilter: videoFilter && videoFilter !== 'normal',
+      postUrl,
+      mediaType: mimeType,
+      caption: body.trim(),
+      hasVideoFilter: !!(videoFilter && videoFilter !== "normal"),
       videoFilter: videoFilter || null,
-      hasImageFilter: imageFilter && imageFilter !== 'normal',
+      hasImageFilter: !!(imageFilter && imageFilter !== "normal"),
       imageFilter: imageFilter || null,
       createdBy: id
     };
 
-    // Save to database
     const post = await PostModel.create(postData);
 
-    console.log('Post created successfully:', {
-      postId: post._id,
-      postUrl: post.postUrl,
-      hasFilters: post.hasVideoFilter || post.hasImageFilter
+    console.log("Post created:", {
+      id: post._id,
+      url: post.postUrl
     });
 
     return res.status(201).json({
       success: true,
-      message: 'Post created successfully!',
+      message: "Post created successfully!",
       data: post
     });
 
   } catch (err) {
-    console.error('Error creating post:', err);
-
-    // Clean up uploaded file on error
-    if (req.file && req.file.path) {
-      try {
-        await fs.remove(req.file.path);
-      } catch (cleanupError) {
-        console.error('File cleanup error:', cleanupError);
-      }
-    }
-
+    console.error("Post creation error:", err);
     return res.status(500).json({
       success: false,
-      message: 'Error creating post',
+      message: "Server error while creating post",
       error: err.message
     });
   }

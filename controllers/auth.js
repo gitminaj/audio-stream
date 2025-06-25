@@ -287,6 +287,14 @@ export const updateProfile = async (req, res) => {
       isPrivate
     } = req.body;
 
+    console.log(name,
+      email,
+      phone,
+      gender,
+      dateOfBirth,
+             // optional: new profile image URL
+      isPrivate)
+
     // Construct update object dynamically
     const updateData = {};
 
@@ -295,8 +303,11 @@ export const updateProfile = async (req, res) => {
     if (phone) updateData.phone = phone;
     if (gender) updateData.gender = gender;
     if (dateOfBirth) updateData.dateOfBirth = dateOfBirth;
-    if (typeof isPrivate === 'boolean') updateData.isPrivate = isPrivate;
+    if (isPrivate) updateData.isPrivate = isPrivate;
     if (profile) updateData.profile = profile; // or handle file upload if needed
+
+    console.log(typeof isPrivate === 'boolean')
+    console.log(updateData)
 
     const updatedUser = await AuthModel.findByIdAndUpdate(
       userId,
