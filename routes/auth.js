@@ -5,7 +5,7 @@ import { upload } from "../config/file-upload.js";
 const router = express.Router();
 
 router.post("/register", upload.single("profile"), register);
-router.put("/profile/:id",upload.single("profile"), updateProfile);
+router.put("/profile/:id",upload.single("profileImage"), updateProfile);
 router.post("/login", login)
 router.post("/sendotp", sendOTP)
 router.get("/users", getUsers)

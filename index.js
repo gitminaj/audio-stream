@@ -13,6 +13,7 @@ import roomRoute from "./routes/room.js"
 import followUserRoute  from "./routes/follow.js"
 import postRoutes from './routes/post.js';
 import chatRoutes from './routes/chat.js';
+import agencyRoutes from './routes/agency.js';
 
 import socketHandlers from './controllers/socketController.js';
 import { authenticateJWT } from "./middleware/verify-token.js";
@@ -58,6 +59,7 @@ app.use("/api/v1/room", roomRoute);
 app.use("/api/v1/follow", followUserRoute);
 app.use("/api/v1/post", postRoutes);
 app.use('/api/v1/chat', authenticateJWT ,chatRoutes);
+app.use('/api/v1/agency' ,agencyRoutes);
 
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);

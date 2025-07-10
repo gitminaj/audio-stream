@@ -1,7 +1,7 @@
 import FollowModel from "../models/follow.js";
 import AuthModel from "../models/auth.js";
 
-// Follow a user
+
 export const followUser = async (req, res) => {
     try {
         const { followerId, followingId } = req.body;
@@ -104,7 +104,7 @@ export const getFollowRequests = async (req, res) => {
 };
 
 
-// Unfollow a user
+
 export const unfollowUser = async (req, res) => {
   try {
     const { followerId, followingId } = req.body;
@@ -133,7 +133,7 @@ export const unfollowUser = async (req, res) => {
   }
 };
 
-// Get followers of a user
+
 export const getFollowers = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -154,7 +154,7 @@ export const getFollowers = async (req, res) => {
   }
 };
 
-// Get following of a user
+
 export const getFollowing = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -184,7 +184,7 @@ export const getDiscoverUsers = async (req, res) => {
 
     const usersToShow = await AuthModel.find({
       _id: { $nin: [...followingIds, currentUserId] },
-    }).select("name profile");
+    }).select("-password");
 
     res.status(200).json(usersToShow);
   } catch (error) {

@@ -83,7 +83,6 @@ export const register = async (req, res) => {
 };
 
 
-
 export const login = async (req, res) => {
     try {
 
@@ -275,7 +274,7 @@ export const updateProfile = async (req, res) => {
     const userId = req.params.id;
     
     const profile = req?.file?.location || null;
-
+    console.log('profile',req.file)
     // Get only allowed fields to update
     const {
       name,
