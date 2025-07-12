@@ -34,11 +34,9 @@ const agencyRegisterSchema = new mongoose.Schema(
         },
         agencyIdProofFile:{
             type: String,
-            required: true
         },
         agencyLogo:{
             type: String,
-            required: true
         },
         accountNumber:{
             type: String,
@@ -47,7 +45,20 @@ const agencyRegisterSchema = new mongoose.Schema(
         IFSC:{
             type: String,
             required: true
+        },
+        status:{
+            type: String,
+            required: true,
+            enum:['approved', 'rejected', 'pending'],
+            default: 'pending'
+        },
+        approvedBy:{
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'superAdmin'
         }
+    },
+    {
+        timestamps: true
     }
 );
 
