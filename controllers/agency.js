@@ -1,7 +1,8 @@
 import agencyRegister from "../models/agencyRegister.js";
 
 export const register = async (req, res) => {
-  console.log("req body", req.body);
+  console.log("req user", req.user);
+  const { id } = req.user;
   try {
     const {
       name,
@@ -54,6 +55,7 @@ export const register = async (req, res) => {
       ...req.body,
       agencyIdProofFile,
       agencyLogo,
+      requestedBy: id
     });
 
     return res.status(201).json({
@@ -72,17 +74,6 @@ export const updateStatus = async (req,res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
-    const { role } = req.user;
-
-    console.log('user', req.user);
-    console.log('role', role);
-
-    if (!(role == 'superadmin')) {
-        return res.status(401).json({
-          success: false,
-          message: "Unauthorized: status can be updated by superadmin only",
-        })
-    }
 
     if (!["approved", "rejected", "pending"].includes(status)) {
       return res.status(400).json({
@@ -106,3 +97,52 @@ export const updateStatus = async (req,res) => {
     });
   }
 };
+
+export const getAllAgency = async (req, res) =>{
+  try {
+    const agency = await agencyRegister.find();
+ 
+    if(!agency){
+      return res.status(404).json({
+       success: false,
+       message: 'Agencys not found '
+     });
+    }
+
+    return res.status(200).json({
+     success: true,
+     data: agency
+    });
+
+  } catch (err) {
+     return res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+}
+
+export const getAgency = async (req, res) =>{
+  try {
+    const { id } = req.params;
+    const agency = await agencyRegister.findById(id);
+ 
+    if(!agency){
+      return res.status(404).json({
+       success: false,
+       message: 'Agency not found '
+     });
+    }
+
+    return res.status(200).json({
+     success: true,
+     data: agency
+    });
+
+  } catch (err) {
+     return res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+}

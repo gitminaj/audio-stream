@@ -2,6 +2,10 @@ import mongoose from "mongoose";
 
 const agencyRegisterSchema = new mongoose.Schema(
     {
+        uniqueId:{
+            type: String,
+            unique: true
+        },
         name:{
             type: String,
             required: true
@@ -21,7 +25,7 @@ const agencyRegisterSchema = new mongoose.Schema(
         },
         number:{
             type: String,
-            requied: true,
+            required: true,
         },
         gender:{
             type: String,
@@ -52,10 +56,19 @@ const agencyRegisterSchema = new mongoose.Schema(
             enum:['approved', 'rejected', 'pending'],
             default: 'pending'
         },
+        requestedBy:{
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Auth',
+            required: true
+        },
         approvedBy:{
             type: mongoose.Schema.Types.ObjectId,
             ref: 'superAdmin'
-        }
+        },
+        // hosts:[{
+        //     type: mongoose.Schema.Types.ObjectId,
+        //     ref:
+        // }]
     },
     {
         timestamps: true
