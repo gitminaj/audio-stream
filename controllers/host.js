@@ -1,4 +1,4 @@
-import agencyRegister from "../models/agencyRegister.js";
+import host from "../models/host.js";
 import crypto from 'crypto'
 
 export const register = async (req, res) => {
@@ -14,6 +14,7 @@ export const register = async (req, res) => {
       idProofName,
       accountNumber,
       IFSC,
+      agencyId
     } = req.body;
 
     if (
@@ -24,7 +25,8 @@ export const register = async (req, res) => {
       !gender ||
       !idProofName ||
       !accountNumber ||
-      !IFSC
+      !IFSC ||
+      !agencyId
     ) {
       return res.status(404).json({
         success: false,
@@ -32,12 +34,12 @@ export const register = async (req, res) => {
       });
     }
 
-    const existRequest = await agencyRegister.findOne({ requestedBy: id });
+    const existAgency = await agencyRegister.findOne({ uniqueId: agencyId });
 
-    if (existRequest) {
-        return res.status(400).json({
+    if (!existAgency) {
+        return res.status(404).json({
           success: false,
-          message: "Agency request already exist with this user",
+          message: "Agency not found",
         });
       }
 

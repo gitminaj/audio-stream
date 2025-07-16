@@ -1,11 +1,7 @@
 import mongoose from "mongoose";
 
-const agencyRegisterSchema = new mongoose.Schema(
+const hostSchema = new mongoose.Schema(
     {
-        uniqueId:{
-            type: String,
-            unique: true
-        },
         name:{
             type: String,
             required: true
@@ -61,19 +57,15 @@ const agencyRegisterSchema = new mongoose.Schema(
             ref: 'Auth',
             required: true
         },
-        approvedBy:{
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'superAdmin'
-        },
-        // hosts:[{
-        //     type: mongoose.Schema.Types.ObjectId,
-        //     ref:  
-        // }]
+        agencyId:{
+            type: String,
+            required: true
+        }
     },
     {
         timestamps: true
     }
 );
 
-const agencyRegisterModel = new mongoose.model('agencyRegister', agencyRegisterSchema);
-export default agencyRegisterModel;
+const hostModel = new mongoose.model('host', hostSchema);
+export default hostModel;
