@@ -1,5 +1,6 @@
+import agencyRegister from "../models/agencyRegister.js";
 import host from "../models/host.js";
-import crypto from 'crypto'
+import crypto from "crypto";
 
 export const register = async (req, res) => {
   console.log("req user", req.user);
@@ -14,7 +15,7 @@ export const register = async (req, res) => {
       idProofName,
       accountNumber,
       IFSC,
-      agencyId
+      agencyId,
     } = req.body;
 
     if (
@@ -37,37 +38,38 @@ export const register = async (req, res) => {
     const existAgency = await agencyRegister.findOne({ uniqueId: agencyId });
 
     if (!existAgency) {
-        return res.status(404).json({
-          success: false,
-          message: "Agency not found",
-        });
-      }
-
-    const existingAgency = await agencyRegister.findOne({ email });
-
-  if (existingAgency) {
-      return res.status(400).json({
+      return res.status(404).json({
         success: false,
-        message: "Agency already exist with this email",
+        message: "Agency not found",
       });
     }
 
-    const agencyIdProofFile =
-      req?.files?.agencyIdProofFile[0]?.location || null;
-    const agencyLogo = req?.files?.agencyLogo[0]?.location || null;
+    const alreadyAdded = existAgency.hosts.find(
+      (hostId) => hostId.toString() === id.toString()
+    );
 
-    if (!agencyIdProofFile || !agencyLogo) {
+    if (alreadyAdded) {
       return res.status(400).json({
         success: false,
-        message: "Id proof file and logo required",
+        message: "You are already a host for this agency",
       });
     }
 
-    const data = await agencyRegister.create({
+    const hostIdProofFile = req?.files?.hostIdProofFile[0]?.location || null;
+    const hostLogo = req?.files?.hostLogo[0]?.location || null;
+
+    if (!hostIdProofFile || !hostLogo) {
+      return res.status(400).json({
+        success: false,
+        message: "Id proof and logo required",
+      });
+    }
+
+    const data = await host.create({
       ...req.body,
-      agencyIdProofFile,
-      agencyLogo,
-      requestedBy: id
+      hostIdProofFile,
+      hostLogo,
+      requestedBy: id,
     });
 
     return res.status(201).json({
@@ -82,46 +84,65 @@ export const register = async (req, res) => {
   }
 };
 
-const generateUniqueId = () => {
-  return crypto.randomBytes(3).toString("hex").toUpperCase(); 
-};
-
-export const updateStatus = async (req,res) => {
+export const updateStatus = async (req, res) => {
+  const { id } = req.params;
+  const { status, agencyId } = req.body;
   try {
-    const { id } = req.params;
-    const { status } = req.body;
-
-    if (!["approved", "rejected", "pending"].includes(status)) {
+ if (!["approved", "rejected", "pending"].includes(status)) {
       return res.status(400).json({
         success: false,
         message: "Status must be one of: approved, rejected, or pending",
       });
     }
 
-    let updateData = { status };
+    const hostRequest = await host.findById(id);
 
-    if (status === "approved") {
-      let uniqueId;
-      let isUnique = false;
-
-      while (!isUnique) {
-        uniqueId = generateUniqueId();
-        const exists = await agencyRegister.findOne({ uniqueId });
-        if (!exists) {
-          isUnique = true;
-        }
-      }
-
-      updateData.uniqueId = uniqueId; 
+    if (!hostRequest) {
+      return res.status(404).json({
+        success: false,
+        message: "Host request not found",
+      });
     }
 
-    const data = await agencyRegister.findByIdAndUpdate(id, updateData, {new: true});
+    if (status === "approved") {
+      const agency = await agencyRegister.findOne({ uniqueId: agencyId });
 
-    return res.status(201).json({
-        success: true,
-        message: 'status updated successfully',
-        data
-    })
+      if (!agency) {
+        return res.status(404).json({
+          success: false,
+          message: "Agency not found",
+        });
+      }
+
+      if ( agency.requestedBy.toString() != req.user.id.toString() ) {
+        return res.status(401).json({
+          success: false,
+          message: "Not authorized to update status",
+        });
+      }
+
+      
+
+      const hostUserId = hostRequest.requestedBy.toString();
+
+      const alreadyExists = agency.hosts.some(
+        (hostId) => hostId.toString() === hostUserId
+      );
+
+      if (!alreadyExists) {
+        agency.hosts.push(hostUserId);
+        await agency.save();
+      }
+    }
+
+    hostRequest.status = status;
+    await hostRequest.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Status updated successfully",
+      data: hostRequest,
+    });
 
   } catch (err) {
     return res.status(500).json({
@@ -131,51 +152,49 @@ export const updateStatus = async (req,res) => {
   }
 };
 
-export const getAllAgency = async (req, res) =>{
+export const getAllAgency = async (req, res) => {
   try {
     const agency = await agencyRegister.find();
- 
-    if(!agency){
+
+    if (!agency) {
       return res.status(404).json({
-       success: false,
-       message: 'Agencys not found '
-     });
+        success: false,
+        message: "Agencys not found ",
+      });
     }
 
     return res.status(200).json({
-     success: true,
-     data: agency
+      success: true,
+      data: agency,
     });
-
   } catch (err) {
-     return res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: err.message,
     });
   }
-}
+};
 
-export const getAgency = async (req, res) =>{
+export const getAgency = async (req, res) => {
   try {
     const { id } = req.params;
     const agency = await agencyRegister.findById(id);
- 
-    if(!agency){
+
+    if (!agency) {
       return res.status(404).json({
-       success: false,
-       message: 'Agency not found '
-     });
+        success: false,
+        message: "Agency not found ",
+      });
     }
 
     return res.status(200).json({
-     success: true,
-     data: agency
+      success: true,
+      data: agency,
     });
-
   } catch (err) {
-     return res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: err.message,
     });
   }
-}
+};

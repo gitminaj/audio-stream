@@ -65,10 +65,10 @@ const agencyRegisterSchema = new mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             ref: 'superAdmin'
         },
-        // hosts:[{
-        //     type: mongoose.Schema.Types.ObjectId,
-        //     ref:  
-        // }]
+        hosts:[{
+            type: mongoose.Schema.Types.ObjectId,
+            ref:  'Auth'
+        }]
     },
     {
         timestamps: true

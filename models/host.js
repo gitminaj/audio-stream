@@ -32,10 +32,10 @@ const hostSchema = new mongoose.Schema(
             type: String,
             required: true
         },
-        agencyIdProofFile:{
+        hostIdProofFile:{
             type: String,
         },
-        agencyLogo:{
+        hostLogo:{
             type: String,
         },
         accountNumber:{
