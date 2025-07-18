@@ -121,8 +121,6 @@ export const updateStatus = async (req, res) => {
         });
       }
 
-      
-
       const hostUserId = hostRequest.requestedBy.toString();
 
       const alreadyExists = agency.hosts.some(
@@ -152,14 +150,14 @@ export const updateStatus = async (req, res) => {
   }
 };
 
-export const getAllAgency = async (req, res) => {
+export const getAllHost = async (req, res) => {
   try {
-    const agency = await agencyRegister.find();
+    const agency = await host.find();
 
     if (!agency) {
       return res.status(404).json({
         success: false,
-        message: "Agencys not found ",
+        message: "Host not found ",
       });
     }
 

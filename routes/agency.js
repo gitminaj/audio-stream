@@ -7,7 +7,7 @@ const router = express.Router();
 
 router.post('/register',upload.fields([ { name: 'agencyIdProofFile' }, { name: 'agencyLogo' } ]), authenticateJWT, register);
 router.put('/updateStatus/:id', superAdminOnly, updateStatus);
-router.get('/getAllAgencys', superAdminOnly, getAllAgency);
+router.get('/getAllAgencys', getAllAgency);
 router.get('/getAgency/:id', superAdminOnly, getAgency);
 
 export default router;
